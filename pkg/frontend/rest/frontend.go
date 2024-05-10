@@ -36,7 +36,7 @@ func (d *Device) FrontendName() string {
 	return frontendName
 }
 
-func (d *Device) Init(name string, size, sectorSize int64) error {
+func (d *Device) Init(name string, _ int, size, sectorSize int64) error {
 	d.Name = name
 	d.Size = size
 	d.SectorSize = sectorSize

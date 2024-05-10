@@ -25,19 +25,21 @@ type Tgt struct {
 	scsiTimeout               time.Duration
 	iscsiAbortTimeout         time.Duration
 	iscsiTargetRequestTimeout time.Duration
+
+	overrideTID int
 }
 
-func New(frontendName string, scsiTimeout, iscsiAbortTimeout, iscsiTargetRequestTimeout time.Duration) types.Frontend {
+func New(frontendName string, scsiTimeout, iscsiAbortTimeout, iscsiTargetRequestTimeout time.Duration, targetID int) types.Frontend {
 	s := socket.New()
-	return &Tgt{s, false, nil, frontendName, scsiTimeout, iscsiAbortTimeout, iscsiTargetRequestTimeout}
+	return &Tgt{s, false, nil, frontendName, scsiTimeout, iscsiAbortTimeout, iscsiTargetRequestTimeout, targetID}
 }
 
 func (t *Tgt) FrontendName() string {
 	return t.frontendName
 }
 
-func (t *Tgt) Init(name string, size, sectorSize int64) error {
-	if err := t.s.Init(name, size, sectorSize); err != nil {
+func (t *Tgt) Init(name string, overrideTID int, size, sectorSize int64) error {
+	if err := t.s.Init(name, overrideTID, size, sectorSize); err != nil {
 		return err
 	}
 
@@ -45,8 +47,11 @@ func (t *Tgt) Init(name string, size, sectorSize int64) error {
 	dev, err := ldc.NewDevice(name, size, t.frontendName,
 		int64(t.scsiTimeout.Seconds()),
 		int64(t.iscsiAbortTimeout.Seconds()),
-		int64(t.iscsiTargetRequestTimeout.Seconds()))
+		int64(t.iscsiTargetRequestTimeout.Seconds()),
+		t.overrideTID,
+	)
 	if err != nil {
+		logrus.Infof("UWU - NewDevice returned error %v", err)
 		return err
 	}
 	t.dev = dev
@@ -106,7 +111,8 @@ func (t *Tgt) Upgrade(name string, size, sectorSize int64, rwu types.ReaderWrite
 	dev, err := ldc.NewDevice(name, size, t.frontendName,
 		int64(t.scsiTimeout.Seconds()),
 		int64(t.iscsiAbortTimeout.Seconds()),
-		int64(t.iscsiTargetRequestTimeout.Seconds()))
+		int64(t.iscsiTargetRequestTimeout.Seconds()),
+		t.overrideTID)
 	if err != nil {
 		return err
 	}
@@ -116,7 +122,7 @@ func (t *Tgt) Upgrade(name string, size, sectorSize int64, rwu types.ReaderWrite
 		return err
 	}
 
-	if err := t.s.Init(name, size, sectorSize); err != nil {
+	if err := t.s.Init(name, t.overrideTID, size, sectorSize); err != nil {
 		return err
 	}
 	if err := t.s.Startup(rwu); err != nil {

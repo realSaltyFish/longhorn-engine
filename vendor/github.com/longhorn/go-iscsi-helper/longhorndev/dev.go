@@ -35,6 +35,7 @@ type LonghornDevice struct {
 	iscsiTargetRequestTimeout int64
 
 	scsiDevice *iscsidev.Device
+	overrideTID int
 }
 
 type DeviceService interface {
@@ -59,7 +60,7 @@ type DeviceCreator interface {
 
 type LonghornDeviceCreator struct{}
 
-func (ldc *LonghornDeviceCreator) NewDevice(name string, size int64, frontend string, scsiTimeout, iscsiAbortTimeout, iscsiTargetRequestTimeout int64) (DeviceService, error) {
+func (ldc *LonghornDeviceCreator) NewDevice(name string, size int64, frontend string, scsiTimeout, iscsiAbortTimeout, iscsiTargetRequestTimeout int64, overrideTID int) (DeviceService, error) {
 	if name == "" || size == 0 {
 		return nil, fmt.Errorf("invalid parameter for creating Longhorn device")
 	}
@@ -70,6 +71,7 @@ func (ldc *LonghornDeviceCreator) NewDevice(name string, size int64, frontend st
 		scsiTimeout:               scsiTimeout,
 		iscsiAbortTimeout:         iscsiAbortTimeout,
 		iscsiTargetRequestTimeout: iscsiTargetRequestTimeout,
+		overrideTID:							 overrideTID,
 	}
 	if err := dev.SetFrontend(frontend); err != nil {
 		return nil, err
@@ -96,7 +98,7 @@ func (d *LonghornDevice) InitDevice() error {
 // call with lock hold
 func (d *LonghornDevice) initScsiDevice() error {
 	bsOpts := fmt.Sprintf("size=%v;request_timeout=%v", d.size, d.iscsiTargetRequestTimeout)
-	scsiDev, err := iscsidev.NewDevice(d.name, d.GetSocketPath(), "longhorn", bsOpts, d.scsiTimeout, d.iscsiAbortTimeout)
+	scsiDev, err := iscsidev.NewDevice(d.name, d.GetSocketPath(), "longhorn", bsOpts, d.scsiTimeout, d.iscsiAbortTimeout, d.overrideTID)
 	if err != nil {
 		return err
 	}

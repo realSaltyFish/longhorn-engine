@@ -1,0 +1,67 @@
+networks:
+  etcd-net:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.24.0.0/16
+
+services:
+  etcd0:
+    image: 'bitnami/etcd:latest'
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+      - ETCD_NAME=etcd0
+      - ETCD_ADVERTISE_CLIENT_URLS=http://172.24.0.20:,http://172.24.0.20:4001
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379,http://0.0.0.0:4001
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
+      - ETCD_INITIAL_ADVERTISE_PEER_URLS=http://172.24.0.20:2380
+      - ETCD_INITIAL_CLUSTER=etcd0=http://172.24.0.20:2380,etcd1=http://172.24.0.21:2380,etcd2=http://172.24.0.22:2380
+      - ETCD_INITIAL_CLUSTER_TOKEN=etcd-cluster-1 
+      - ETCD_INITIAL_CLUSTER_STATE=new
+    networks:
+      etcd-net:
+        ipv4_address: 172.24.0.20
+    privileged: true
+    volumes:
+      - ./etcd0:/bitnami/etcd
+
+
+  etcd1:
+    image: 'bitnami/etcd:latest'
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+      - ETCD_NAME=etcd1
+      - ETCD_ADVERTISE_CLIENT_URLS=http://172.24.0.21:2379,http://172.24.0.21:4001
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379,http://0.0.0.0:4001
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
+      - ETCD_INITIAL_ADVERTISE_PEER_URLS=http://172.24.0.21:2380
+      - ETCD_INITIAL_CLUSTER=etcd0=http://172.24.0.20:2380,etcd1=http://172.24.0.21:2380,etcd2=http://172.24.0.22:2380
+      - ETCD_INITIAL_CLUSTER_TOKEN=etcd-cluster-1
+      - ETCD_INITIAL_CLUSTER_STATE=new
+    networks:
+      etcd-net:
+        ipv4_address: 172.24.0.21
+    privileged: true
+    volumes:
+      - ./etcd1:/bitnami/etcd
+    
+
+  etcd2:
+    image: 'bitnami/etcd:latest'
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+      - ETCD_NAME=etcd2
+      - ETCD_ADVERTISE_CLIENT_URLS=http://172.24.0.22:2379,http://172.24.0.22:4001
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379,http://0.0.0.0:4001
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
+      - ETCD_INITIAL_ADVERTISE_PEER_URLS=http://172.24.0.22:2380
+      - ETCD_INITIAL_CLUSTER=etcd0=http://172.24.0.20:2380,etcd1=http://172.24.0.21:2380,etcd2=http://172.24.0.22:2380
+      - ETCD_INITIAL_CLUSTER_TOKEN=etcd-cluster-1 
+      - ETCD_INITIAL_CLUSTER_STATE=new
+    privileged: true
+    networks:
+      etcd-net:
+        ipv4_address: 172.24.0.22
+    volumes:
+      - ./etcd2:/bitnami/etcd

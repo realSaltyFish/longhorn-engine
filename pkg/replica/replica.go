@@ -1260,6 +1260,7 @@ func (r *Replica) Expand(size int64) (err error) {
 }
 
 func (r *Replica) WriteAt(buf []byte, offset int64) (int, error) {
+	logrus.Infof("UwU - WriteAt started - %d+%d", offset, len(buf))
 	if r.readOnly {
 		return 0, fmt.Errorf("cannot write on read-only replica")
 	}

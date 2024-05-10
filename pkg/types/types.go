@@ -107,7 +107,7 @@ type Backend interface {
 }
 
 type BackendFactory interface {
-	Create(volumeName, address string, dataServerProtocol DataServerProtocol, engineReplicaTimeout time.Duration) (Backend, error)
+	Create(volumeName, address string, dataServerProtocol DataServerProtocol, engineReplicaTimeout time.Duration, ignoreWrites bool) (Backend, error)
 }
 
 type Controller interface {
@@ -142,7 +142,7 @@ type ReplicaSalvageInfo struct {
 
 type Frontend interface {
 	FrontendName() string
-	Init(name string, size, sectorSize int64) error
+	Init(name string, overrideTID int, size, sectorSize int64) error
 	Startup(rwu ReaderWriterUnmapperAt) error
 	Shutdown() error
 	State() State

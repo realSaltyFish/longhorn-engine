@@ -27,6 +27,7 @@ func New() *Socket {
 
 type Socket struct {
 	Volume      string
+	overrideTID int
 	Size        int64
 	SectorSize  int
 	ScsiTimeout int
@@ -40,8 +41,9 @@ func (t *Socket) FrontendName() string {
 	return frontendName
 }
 
-func (t *Socket) Init(name string, size, sectorSize int64) error {
+func (t *Socket) Init(name string, overrideTID int, size, sectorSize int64) error {
 	t.Volume = name
+	t.overrideTID = overrideTID
 	t.Size = size
 	t.SectorSize = int(sectorSize)
 

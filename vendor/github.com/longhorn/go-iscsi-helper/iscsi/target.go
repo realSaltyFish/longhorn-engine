@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	lhtypes "github.com/longhorn/go-common-libs/types"
 	lhexec "github.com/longhorn/go-common-libs/exec"
@@ -33,6 +34,7 @@ const (
 // unspecified, a name will be generated. Notice the name must comply with iSCSI
 // name format.
 func CreateTarget(tid int, name string) error {
+	logrus.Infof("UWU - Creating target with tid %d and name %s", tid, name)
 	opts := []string{
 		"--lld", "iscsi",
 		"--op", "new",
@@ -395,6 +397,7 @@ func FindNextAvailableTargetID() (int, error) {
 				return -1, errors.Wrapf(err, "BUG: Failed to parse %s", tidString)
 			}
 			existingTids[tid] = struct{}{}
+			logrus.Infof("UwU - tid is %d", tid)
 		}
 	}
 	for i := 1; i < maxTargetID; i++ {

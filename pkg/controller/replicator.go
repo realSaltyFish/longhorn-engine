@@ -122,6 +122,9 @@ func (r *replicator) ReadAt(buf []byte, off int64) (int, error) {
 }
 
 func (r *replicator) WriteAt(p []byte, off int64) (int, error) {
+
+	// logrus.Infof("UwU - replicator WriteAt offset %d", off)
+
 	if !r.backendsAvailable {
 		return 0, ErrNoBackend
 	}

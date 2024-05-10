@@ -61,6 +61,17 @@ func ControllerCmd() cli.Command {
 				Hidden: false,
 				Usage:  "Start engine controller in a special mode only to get best replica candidate for salvage",
 			},
+			cli.BoolFlag{
+				Name:   "ignoreWrites",
+				Hidden: false,
+				Usage:  "Start engine controller in a special mode that ignores all write operations and directly reports success",
+			},
+			cli.IntFlag{
+				Name:     "overrideTID",
+				Required: false,
+				Value:    0,
+				Usage:    "Target ID to use when registering our iSCSI block device with the kernel",
+			},
 			cli.Int64Flag{
 				Name:   "engine-replica-timeout",
 				Hidden: false,
@@ -102,6 +113,9 @@ func ControllerCmd() cli.Command {
 }
 
 func startController(c *cli.Context) error {
+	logrus.SetFormatter(&logrus.TextFormatter{
+		TimestampFormat: "2006-01-02 15:04:05.000000",
+	})
 	if c.NArg() == 0 {
 		return errors.New("volume name is required")
 	}
@@ -119,6 +133,8 @@ func startController(c *cli.Context) error {
 	isUpgrade := c.Bool("upgrade")
 	disableRevCounter := c.Bool("disableRevCounter")
 	salvageRequested := c.Bool("salvageRequested")
+	ignoreWrites := c.Bool("ignoreWrites")
+	overrideTID := c.Int("overrideTID")
 	unmapMarkSnapChainRemoved := c.Bool("unmap-mark-snap-chain-removed")
 	dataServerProtocol := c.String("data-server-protocol")
 	fileSyncHTTPClientTimeout := c.Int("file-sync-http-client-timeout")
@@ -171,7 +187,7 @@ func startController(c *cli.Context) error {
 
 	var frontend types.Frontend
 	if frontendName != "" {
-		f, err := controller.NewFrontend(frontendName, iscsiTargetRequestTimeout)
+		f, err := controller.NewFrontend(frontendName, iscsiTargetRequestTimeout, overrideTID)
 		if err != nil {
 			return errors.Wrapf(err, "failed to find frontend: %s", frontendName)
 		}
@@ -180,8 +196,8 @@ func startController(c *cli.Context) error {
 
 	logrus.Infof("Creating volume %v controller with iSCSI target request timeout %v and engine to replica(s) timeout %v",
 		volumeName, iscsiTargetRequestTimeout, engineReplicaTimeout)
-	control := controller.NewController(volumeName, dynamic.New(factories), frontend, isUpgrade, disableRevCounter, salvageRequested,
-		unmapMarkSnapChainRemoved, iscsiTargetRequestTimeout, engineReplicaTimeout, types.DataServerProtocol(dataServerProtocol),
+	control := controller.NewController(volumeName, dynamic.New(factories), frontend, isUpgrade, disableRevCounter, salvageRequested, ignoreWrites,
+		unmapMarkSnapChainRemoved, overrideTID, iscsiTargetRequestTimeout, engineReplicaTimeout, types.DataServerProtocol(dataServerProtocol),
 		fileSyncHTTPClientTimeout, snapshotMaxCount, snapshotMaxSize)
 
 	// need to wait for Shutdown() completion

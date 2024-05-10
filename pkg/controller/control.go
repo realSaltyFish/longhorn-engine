@@ -40,6 +40,8 @@ type Controller struct {
 	isExpanding             bool
 	revisionCounterDisabled bool
 	salvageRequested        bool
+	ignoreWrites            bool
+	overrideTID             int
 
 	unmapMarkSnapChainRemoved bool
 	snapshotMaxCount          int
@@ -70,7 +72,7 @@ const (
 	lastModifyCheckPeriod = 5 * time.Second
 )
 
-func NewController(name string, factory types.BackendFactory, frontend types.Frontend, isUpgrade, disableRevCounter, salvageRequested, unmapMarkSnapChainRemoved bool,
+func NewController(name string, factory types.BackendFactory, frontend types.Frontend, isUpgrade, disableRevCounter, salvageRequested, ignoreWrites, unmapMarkSnapChainRemoved bool, overrideTID int,
 	iscsiTargetRequestTimeout, engineReplicaTimeout time.Duration, dataServerProtocol types.DataServerProtocol, fileSyncHTTPClientTimeout, snapshotMaxCount int, snapshotMaxSize int64) *Controller {
 	c := &Controller{
 		factory:       factory,
@@ -82,6 +84,8 @@ func NewController(name string, factory types.BackendFactory, frontend types.Fro
 		isUpgrade:                 isUpgrade,
 		revisionCounterDisabled:   disableRevCounter,
 		salvageRequested:          salvageRequested,
+		ignoreWrites:              ignoreWrites,
+		overrideTID:               overrideTID,
 		unmapMarkSnapChainRemoved: unmapMarkSnapChainRemoved,
 		snapshotMaxCount:          snapshotMaxCount,
 		SnapshotMaxSize:           snapshotMaxSize,
@@ -170,7 +174,7 @@ func (c *Controller) addReplica(address string, snapshotRequired bool, mode type
 		return err
 	}
 
-	newBackend, err := c.factory.Create(c.VolumeName, address, c.DataServerProtocol, c.engineReplicaTimeout)
+	newBackend, err := c.factory.Create(c.VolumeName, address, c.DataServerProtocol, c.engineReplicaTimeout, c.ignoreWrites)
 	if err != nil {
 		return err
 	}
@@ -481,7 +485,7 @@ func (c *Controller) startFrontend() error {
 			}
 			return nil
 		}
-		if err := c.frontend.Init(c.VolumeName, c.size, c.sectorSize); err != nil {
+		if err := c.frontend.Init(c.VolumeName, c.overrideTID, c.size, c.sectorSize); err != nil {
 			logrus.WithError(err).Error("Failed to init frontend")
 			return errors.Wrap(err, "failed to init frontend")
 		}
@@ -510,7 +514,7 @@ func (c *Controller) StartFrontend(frontend string) error {
 		}
 	}
 
-	f, err := NewFrontend(frontend, c.iscsiTargetRequestTimeout)
+	f, err := NewFrontend(frontend, c.iscsiTargetRequestTimeout, c.overrideTID)
 	if err != nil {
 		return errors.Wrapf(err, "failed to find frontend: %s", frontend)
 	}
@@ -830,7 +834,7 @@ func (c *Controller) Start(volumeSize, volumeCurrentSize int64, addresses ...str
 	errorCodes := map[string]codes.Code{}
 	first := true
 	for _, address := range addresses {
-		newBackend, err := c.factory.Create(c.VolumeName, address, c.DataServerProtocol, c.engineReplicaTimeout)
+		newBackend, err := c.factory.Create(c.VolumeName, address, c.DataServerProtocol, c.engineReplicaTimeout, c.ignoreWrites)
 		if err != nil {
 			if strings.Contains(err.Error(), "rpc error: code = Unavailable") {
 				errorCodes[address] = codes.Unavailable
@@ -966,6 +970,12 @@ func (c *Controller) Start(volumeSize, volumeCurrentSize int64, addresses ...str
 }
 
 func (c *Controller) WriteAt(b []byte, off int64) (int, error) {
+	logrus.Infof("UwU - WriteAt started - %d+%d", off, len(b))
+	defer logrus.Infof("UwU - WriteAt completed - %d+%d", off, len(b))
+	if c.ignoreWrites {
+		logrus.Infof("UwU - WriteAt ignored - %d+%d", off, len(b))
+		return len(b), nil
+	}
 	c.RLock()
 	l := len(b)
 	if off < 0 || off+int64(l) > c.size {
@@ -1029,14 +1039,17 @@ func (c *Controller) writeInNormalMode(b []byte, off int64) (int, error) {
 
 func (c *Controller) ReadAt(b []byte, off int64) (int, error) {
 	c.RLock()
+	// logrus.Infof("UwU - ReadAt offset %d", off)
 	l := len(b)
 	if off < 0 || off+int64(l) > c.size {
 		err := fmt.Errorf("EOF: Read of %v bytes at offset %v is beyond volume size %v", l, off, c.size)
+		// logrus.Infof("UwU - Failed ReadAt offset %d: %s", off, string(b))
 		c.RUnlock()
 		return 0, err
 	}
 	startTime := time.Now()
 	n, err := c.backend.ReadAt(b, off)
+	// logrus.Infof("UwU - Finished ReadAt offset %d: %s", off, string(b))
 	c.RUnlock()
 	if err != nil {
 		return n, c.handleError(err)
@@ -1046,6 +1059,12 @@ func (c *Controller) ReadAt(b []byte, off int64) (int, error) {
 }
 
 func (c *Controller) UnmapAt(length uint32, off int64) (int, error) {
+
+	if c.ignoreWrites {
+		logrus.Infof("UwU - UnmapAt ignored - %d+%d", off, length)
+		return int(length), nil // NOTE: might be wrong return value
+	}
+
 	// TODO: Need to fail unmap requests
 	//  if the volume is purging snapshots or creating backups.
 	c.RLock()

@@ -378,7 +378,7 @@ func (r *Remote) info() (*types.ReplicaInfo, error) {
 	return replicaClient.GetReplicaInfo(resp.Replica), nil
 }
 
-func (rf *Factory) Create(volumeName, address string, dataServerProtocol types.DataServerProtocol, engineToReplicaTimeout time.Duration) (types.Backend, error) {
+func (rf *Factory) Create(volumeName, address string, dataServerProtocol types.DataServerProtocol, engineToReplicaTimeout time.Duration, ignoreWrites bool) (types.Backend, error) {
 	logrus.Infof("Connecting to remote: %s (%v)", address, dataServerProtocol)
 
 	controlAddress, dataAddress, _, _, err := util.GetAddresses(volumeName, address, dataServerProtocol)
@@ -401,8 +401,17 @@ func (rf *Factory) Create(volumeName, address string, dataServerProtocol types.D
 		return nil, err
 	}
 
-	if replica.State != string(types.ReplicaStateClosed) {
-		return nil, fmt.Errorf("replica must be closed, cannot add in state: %s", replica.State)
+	// state can be: initial, open, closed, dirty, rebuilding, error
+	if ignoreWrites {
+		if replica.State != string(types.ReplicaStateClosed) &&
+			replica.State != string(types.ReplicaStateOpen) &&
+			replica.State != string(types.ReplicaStateDirty) {
+			return nil, fmt.Errorf("ignoring writes; replica must be closed / open / dirty, cannot add in state: %s", replica.State)
+		}
+	} else {
+		if replica.State != string(types.ReplicaStateClosed) {
+			return nil, fmt.Errorf("not ignoring writes; replica must be closed, cannot add in state: %s", replica.State)
+		}
 	}
 
 	conn, err := connect(dataServerProtocol, dataAddress)

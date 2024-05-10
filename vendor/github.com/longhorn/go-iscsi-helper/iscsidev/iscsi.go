@@ -47,11 +47,12 @@ type Device struct {
 	BSOpts      string
 
 	targetID int
+	overrideTID int
 
 	nsexec *lhns.Executor
 }
 
-func NewDevice(name, backingFile, bsType, bsOpts string, scsiTimeout, iscsiAbortTimeout int64) (*Device, error) {
+func NewDevice(name, backingFile, bsType, bsOpts string, scsiTimeout, iscsiAbortTimeout int64, overrideTID int) (*Device, error) {
 	namespaces := []lhtypes.Namespace{lhtypes.NamespaceMnt, lhtypes.NamespaceNet}
 	nsexec, err := lhns.NewNamespaceExecutor(util.ISCSIdProcess, lhtypes.HostProcDirectory, namespaces)
 	if err != nil {
@@ -59,7 +60,7 @@ func NewDevice(name, backingFile, bsType, bsOpts string, scsiTimeout, iscsiAbort
 	}
 
 	dev := &Device{
-		Target: GetTargetName(name),
+		Target: fmt.Sprintf("%s:%d", GetTargetName(name), overrideTID),
 		ScsiDeviceParameters: ScsiDeviceParameters{
 			ScsiTimeout: scsiTimeout,
 		},
@@ -70,6 +71,7 @@ func NewDevice(name, backingFile, bsType, bsOpts string, scsiTimeout, iscsiAbort
 		BSType:      bsType,
 		BSOpts:      bsOpts,
 		nsexec:      nsexec,
+		overrideTID: overrideTID,
 	}
 	return dev, nil
 }
@@ -97,12 +99,17 @@ func (dev *Device) CreateTarget() (err error) {
 		return err
 	}
 
-	tid := 0
+	var tid int
 	for i := 0; i < RetryCounts; i++ {
-		if tid, err = iscsi.FindNextAvailableTargetID(); err != nil {
-			return err
+		if dev.overrideTID == 0 {
+			if tid, err = iscsi.FindNextAvailableTargetID(); err != nil {
+				return err
+			}
+			logrus.Infof("go-iscsi-helper: found available target id %d", tid)
+		} else {
+			tid = dev.overrideTID
+			logrus.Infof("go-iscsi-helper: using override target id %d", tid)
 		}
-		logrus.Infof("go-iscsi-helper: found available target id %v", tid)
 		err = iscsi.CreateTarget(tid, dev.Target)
 		if err == nil {
 			dev.targetID = tid

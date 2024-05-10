@@ -67,7 +67,10 @@ func (s *Server) Open() error {
 	defer s.Unlock()
 
 	if s.r != nil {
-		return fmt.Errorf("replica is already open")
+		// NOTE: we think open is only for initializing the replica
+		// TODO: disallow concurrent RW controller connections
+		return nil
+		// return fmt.Errorf("replica is already open")
 	}
 
 	_, info := s.Status()
